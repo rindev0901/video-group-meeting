@@ -71,10 +71,24 @@ const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
   width: 25%;
-  hieght: 100%;
+  height: 100%;
   background-color: white;
   transition: all 0.5s ease;
   overflow: hidden;
+
+  &.width0 {
+    width: 0%;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    height: 15vh;
+
+    &.width0 {
+      width: 0%;
+      height: 0%;
+    }
+  }
 `;
 
 const TopHeader = styled.div`
@@ -83,6 +97,11 @@ const TopHeader = styled.div`
   font-weight: 600;
   font-size: 20px;
   color: black;
+
+  @media (max-width: 768px) {
+    margin-top: 5px;
+    font-size: 16px;
+  }
 `;
 
 const ChatArea = styled.div`
@@ -91,6 +110,11 @@ const ChatArea = styled.div`
   max-height: 83%;
   overflow-x: hidden;
   overflow-y: auto;
+
+  @media (max-width: 768px) {
+    height: 70%;
+    max-height: 70%;
+  }
 `;
 
 const MessageList = styled.div`
@@ -99,6 +123,14 @@ const MessageList = styled.div`
   flex-direction: column;
   padding: 15px;
   color: #454552;
+
+  @media (max-width: 768px) {
+    padding: 10px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 5px;
+  }
 `;
 
 const Message = styled.div`
@@ -124,6 +156,29 @@ const Message = styled.div`
     border-radius: 15px;
     box-shadow: 0px 0px 3px #4ea1d3;
     font-size: 14px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+    margin-top: 10px;
+    margin-left: 10px;
+
+    > p {
+      max-width: 85%;
+      padding: 7px;
+      font-size: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    font-size: 12px;
+    margin-top: 5px;
+    margin-left: 5px;
+
+    > p {
+      padding: 5px;
+      font-size: 10px;
+    }
   }
 `;
 
@@ -153,6 +208,37 @@ const UserMessage = styled.div`
     font-size: 14px;
     text-align: left;
   }
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+    margin-top: 10px;
+
+    > strong {
+      margin-right: 25px;
+    }
+
+    > p {
+      max-width: 85%;
+      padding: 7px;
+      margin-right: 20px;
+      font-size: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    font-size: 12px;
+    margin-top: 5px;
+
+    > strong {
+      margin-right: 15px;
+    }
+
+    > p {
+      padding: 5px;
+      margin-right: 10px;
+      font-size: 10px;
+    }
+  }
 `;
 
 const BottomInput = styled.input`
@@ -166,6 +252,17 @@ const BottomInput = styled.input`
 
   :focus {
     outline: none;
+  }
+
+  @media (max-width: 768px) {
+    height: 15%;
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 8px;
+    font-size: 12px;
   }
 `;
 

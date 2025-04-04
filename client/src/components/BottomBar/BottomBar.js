@@ -90,21 +90,50 @@ const Bar = styled.div`
   align-items: center;
   font-weight: 500;
   background-color: #4ea1d3;
+
+  @media (max-width: 768px) {
+    height: 10%;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 480px) {
+    height: 15%;
+  }
 `;
 const Left = styled.div`
   display: flex;
   align-items: center;
-
   margin-left: 15px;
+
+  @media (max-width: 768px) {
+    margin-left: 10px;
+  }
+
+  @media (max-width: 480px) {
+    margin-left: 5px;
+  }
 `;
 
 const Center = styled.div`
   flex: 1;
   display: flex;
   justify-content: center;
+
+  @media (max-width: 480px) {
+    flex: 0;
+    width: 100%;
+    justify-content: space-around;
+    margin-top: 5px;
+  }
 `;
 
-const Right = styled.div``;
+const Right = styled.div`
+  @media (max-width: 480px) {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+  }
+`;
 
 const ChatButton = styled.div`
   width: 75px;
@@ -120,6 +149,16 @@ const ChatButton = styled.div`
 
   * {
     pointer-events: none;
+  }
+
+  @media (max-width: 768px) {
+    width: 60px;
+    font-size: 0.8125rem;
+  }
+
+  @media (max-width: 480px) {
+    width: 45px;
+    font-size: 0.75rem;
   }
 `;
 
@@ -138,11 +177,30 @@ const ScreenButton = styled.div`
   .sharing {
     color: #ee2560;
   }
+
+  @media (max-width: 768px) {
+    font-size: 0.8125rem;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 0.75rem;
+    padding: 3px;
+  }
 `;
 
 const FaIcon = styled.i`
   width: 30px;
   font-size: calc(16px + 1vmin);
+
+  @media (max-width: 768px) {
+    width: 25px;
+    font-size: calc(14px + 1vmin);
+  }
+
+  @media (max-width: 480px) {
+    width: 20px;
+    font-size: calc(12px + 1vmin);
+  }
 `;
 
 const StopButton = styled.div`
@@ -158,6 +216,22 @@ const StopButton = styled.div`
   :hover {
     background-color: #f25483;
     cursor: pointer;
+  }
+
+  @media (max-width: 768px) {
+    width: 60px;
+    height: 25px;
+    line-height: 25px;
+    font-size: 0.8125rem;
+    margin-right: 10px;
+  }
+
+  @media (max-width: 480px) {
+    width: 45px;
+    height: 25px;
+    line-height: 25px;
+    font-size: 0.75rem;
+    margin-right: 5px;
   }
 `;
 
@@ -185,6 +259,16 @@ const CameraButton = styled.div`
   .fa-video-slash {
     color: #ee2560;
   }
+
+  @media (max-width: 768px) {
+    width: 60px;
+    font-size: 0.8125rem;
+  }
+
+  @media (max-width: 480px) {
+    width: 45px;
+    font-size: 0.75rem;
+  }
 `;
 
 const SwitchMenu = styled.div`
@@ -208,6 +292,14 @@ const SwitchMenu = styled.div`
   > i {
     width: 90%;
     font-size: calc(10px + 1vmin);
+  }
+
+  @media (max-width: 768px) {
+    left: 60px;
+  }
+
+  @media (max-width: 480px) {
+    left: 45px;
   }
 `;
 
@@ -239,6 +331,24 @@ const SwitchList = styled.div`
   > div:last-child {
     border-top: 1px solid white;
     cursor: context-menu !important;
+  }
+
+  @media (max-width: 768px) {
+    left: 60px;
+    
+    > div {
+      font-size: 0.75rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    left: 45px;
+    max-width: 180px;
+    padding: 5px;
+    
+    > div {
+      font-size: 0.7rem;
+    }
   }
 `;
 

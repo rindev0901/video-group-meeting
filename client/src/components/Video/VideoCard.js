@@ -21,6 +21,19 @@ const VideoCard = (props) => {
   );
 };
 
-const Video = styled.video``;
+const Video = styled.video`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+  
+  @media (max-width: 768px) {
+    border-radius: 4px;
+  }
+  
+  @media (max-width: 480px) {
+    border-radius: 3px;
+  }
+`;
 
 export default VideoCard;
