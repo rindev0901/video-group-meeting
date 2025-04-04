@@ -4,11 +4,11 @@
   "description": "video call server",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "set NODE_ENV=production&& node index.js",
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Hyunse Kim",
+  "author": "Nguyen Huynh Duc",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
