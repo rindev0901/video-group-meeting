@@ -37,11 +37,11 @@ export default function Login() {
           },
         }
       );
-
-      if (!res.ok) throw new Error("Login failed!");
-
       const data = await res.json();
       console.log("loginResponse:::", data);
+
+      if (!res.ok || !data.success) throw new Error(data?.message);
+
       // Do something with the response
     } catch (error) {
       console.error("Server error:::", error);

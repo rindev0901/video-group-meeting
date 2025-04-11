@@ -37,11 +37,10 @@ export default function Register() {
           },
         }
       );
-
-      if (!res.ok) throw new Error("Register failed!");
-
       const data = await res.json();
       console.log("registerResponse:::", data);
+
+      if (!res.ok || !data.success) throw new Error(data?.message);
       // Do something with the response
     } catch (error) {
       console.error("Server error:::", error);
