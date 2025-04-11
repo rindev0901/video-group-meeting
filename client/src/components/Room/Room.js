@@ -1,13 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Peer from 'simple-peer';
-import styled from 'styled-components';
-import socket from '../../socket';
-import VideoCard from '../Video/VideoCard';
-import BottomBar from '../BottomBar/BottomBar';
-import Chat from '../Chat/Chat';
+import React, { useState, useEffect, useRef } from "react";
+import Peer from "simple-peer";
+import styled from "styled-components";
+import socket from "../../socket";
+import VideoCard from "../Video/VideoCard";
+import BottomBar from "../BottomBar/BottomBar";
+import Chat from "../Chat/Chat";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { message } from "antd";
 
-const Room = (props) => {
-  const currentUser = sessionStorage.getItem('user');
+const Room = () => {
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [peers, setPeers] = useState([]);
   const [userVideoAudio, setUserVideoAudio] = useState({
     localUser: { video: true, audio: true },
@@ -16,111 +21,167 @@ const Room = (props) => {
   const [displayChat, setDisplayChat] = useState(false);
   const [screenShare, setScreenShare] = useState(false);
   const [showVideoDevices, setShowVideoDevices] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
   const peersRef = useRef([]);
   const userVideoRef = useRef();
   const screenTrackRef = useRef();
   const userStream = useRef();
-  const roomId = props.match.params.roomId;
+
+  const startMediaDevices = async () => {
+    try {
+      // First try to get both video and audio
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      handleSuccess(stream);
+    } catch (e) {
+      console.log("Failed to get both video and audio:", e);
+      try {
+        // If that fails, try just audio
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: true,
+        });
+        handleSuccess(stream);
+        setUserVideoAudio((prev) => ({
+          ...prev,
+          localUser: { ...prev.localUser, video: false },
+        }));
+        message.warning("Could not access camera. Joining with audio only.");
+      } catch (e) {
+        console.log("Failed to get audio:", e);
+        try {
+          // If that fails too, try just video
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          handleSuccess(stream);
+          setUserVideoAudio((prev) => ({
+            ...prev,
+            localUser: { ...prev.localUser, audio: false },
+          }));
+          message.warning(
+            "Could not access microphone. Joining with video only."
+          );
+        } catch (e) {
+          console.log("Failed to get any media devices:", e);
+          setMediaError(true);
+          message.error(
+            "Could not access any media devices. Please check your permissions."
+          );
+          // Optionally navigate back
+          // navigate('/');
+        }
+      }
+    }
+  };
+
+  const handleSuccess = (stream) => {
+    userVideoRef.current.srcObject = stream;
+    userStream.current = stream;
+
+    socket.emit("BE-join-room", { roomId, userName: currentUser });
+  };
 
   useEffect(() => {
-    // Get Video Devices
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      const filtered = devices.filter((device) => device.kind === 'videoinput');
-      setVideoDevices(filtered);
+    // Get available video devices
+    const getVideoDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const filtered = devices.filter(
+          (device) => device.kind === "videoinput"
+        );
+        setVideoDevices(filtered);
+      } catch (e) {
+        console.log("Error getting video devices:", e);
+        setVideoDevices([]);
+      }
+    };
+
+    getVideoDevices();
+    startMediaDevices();
+
+    // Socket event listeners
+    socket.on("FE-user-join", (users) => {
+      const peers = [];
+      users.forEach(({ userId, info }) => {
+        let { userName, video, audio } = info;
+
+        if (userName !== currentUser) {
+          const peer = createPeer(userId, socket.id, userStream.current);
+          peer.userName = userName;
+          peer.peerID = userId;
+
+          peersRef.current.push({
+            peerID: userId,
+            peer,
+            userName,
+          });
+          peers.push(peer);
+
+          setUserVideoAudio((preList) => ({
+            ...preList,
+            [peer.userName]: { video, audio },
+          }));
+        }
+      });
+      setPeers(peers);
     });
 
-    // Set Back Button Event
-    window.addEventListener('popstate', goToBack);
+    socket.on("FE-receive-call", ({ signal, from, info }) => {
+      let { userName, video, audio } = info;
+      const peerIdx = findPeer(from);
 
-    // Connect Camera & Mic
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((stream) => {
-        userVideoRef.current.srcObject = stream;
-        userStream.current = stream;
+      if (!peerIdx) {
+        const peer = addPeer(signal, from, userStream.current);
 
-        socket.emit('BE-join-room', { roomId, userName: currentUser });
-        socket.on('FE-user-join', (users) => {
-          // all users
-          const peers = [];
-          users.forEach(({ userId, info }) => {
-            let { userName, video, audio } = info;
+        peer.userName = userName;
 
-            if (userName !== currentUser) {
-              const peer = createPeer(userId, socket.id, stream);
-
-              peer.userName = userName;
-              peer.peerID = userId;
-
-              peersRef.current.push({
-                peerID: userId,
-                peer,
-                userName,
-              });
-              peers.push(peer);
-
-              setUserVideoAudio((preList) => {
-                return {
-                  ...preList,
-                  [peer.userName]: { video, audio },
-                };
-              });
-            }
-          });
-
-          setPeers(peers);
+        peersRef.current.push({
+          peerID: from,
+          peer,
+          userName: userName,
         });
-
-        socket.on('FE-receive-call', ({ signal, from, info }) => {
-          let { userName, video, audio } = info;
-          const peerIdx = findPeer(from);
-
-          if (!peerIdx) {
-            const peer = addPeer(signal, from, stream);
-
-            peer.userName = userName;
-
-            peersRef.current.push({
-              peerID: from,
-              peer,
-              userName: userName,
-            });
-            setPeers((users) => {
-              return [...users, peer];
-            });
-            setUserVideoAudio((preList) => {
-              return {
-                ...preList,
-                [peer.userName]: { video, audio },
-              };
-            });
-          }
+        setPeers((users) => {
+          return [...users, peer];
         });
-
-        socket.on('FE-call-accepted', ({ signal, answerId }) => {
-          const peerIdx = findPeer(answerId);
-          peerIdx.peer.signal(signal);
+        setUserVideoAudio((preList) => {
+          return {
+            ...preList,
+            [peer.userName]: { video, audio },
+          };
         });
+      }
+    });
 
-        socket.on('FE-user-leave', ({ userId, userName }) => {
-          const peerIdx = findPeer(userId);
-          peerIdx.peer.destroy();
-          setPeers((users) => {
-            users = users.filter((user) => user.peerID !== peerIdx.peer.peerID);
-            return [...users];
-          });
-          peersRef.current = peersRef.current.filter(({ peerID }) => peerID !== userId );
-        });
-      });
+    socket.on("FE-call-accepted", ({ signal, answerId }) => {
+      const peerIdx = findPeer(answerId);
+      peerIdx.peer.signal(signal);
+    });
 
-    socket.on('FE-toggle-camera', ({ userId, switchTarget }) => {
+    socket.on("FE-user-leave", ({ userId, userName }) => {
       const peerIdx = findPeer(userId);
+      peerIdx?.peer.destroy();
+      setPeers((users) => {
+        users = users.filter((user) => user.peerID !== peerIdx?.peer.peerID);
+        return [...users];
+      });
+      peersRef.current = peersRef.current.filter(
+        ({ peerID }) => peerID !== userId
+      );
+    });
+
+    socket.on("FE-toggle-camera", ({ userId, switchTarget }) => {
+      const peerIdx = findPeer(userId);
+      if (!peerIdx) return;
 
       setUserVideoAudio((preList) => {
         let video = preList[peerIdx.userName].video;
         let audio = preList[peerIdx.userName].audio;
 
-        if (switchTarget === 'video') video = !video;
+        if (switchTarget === "video") video = !video;
         else audio = !audio;
 
         return {
@@ -131,10 +192,11 @@ const Room = (props) => {
     });
 
     return () => {
+      // Cleanup
+      userStream.current?.getTracks().forEach((track) => track.stop());
       socket.disconnect();
     };
-    // eslint-disable-next-line
-  }, []);
+  }, [roomId, currentUser]);
 
   function createPeer(userId, caller, stream) {
     const peer = new Peer({
@@ -143,14 +205,14 @@ const Room = (props) => {
       stream,
     });
 
-    peer.on('signal', (signal) => {
-      socket.emit('BE-call-user', {
+    peer.on("signal", (signal) => {
+      socket.emit("BE-call-user", {
         userToCall: userId,
         from: caller,
         signal,
       });
     });
-    peer.on('disconnect', () => {
+    peer.on("disconnect", () => {
       peer.destroy();
     });
 
@@ -164,11 +226,11 @@ const Room = (props) => {
       stream,
     });
 
-    peer.on('signal', (signal) => {
-      socket.emit('BE-accept-call', { signal, to: callerId });
+    peer.on("signal", (signal) => {
+      socket.emit("BE-accept-call", { signal, to: callerId });
     });
 
-    peer.on('disconnect', () => {
+    peer.on("disconnect", () => {
       peer.destroy();
     });
 
@@ -184,12 +246,12 @@ const Room = (props) => {
   function createUserVideo(peer, index, arr) {
     return (
       <VideoBox
-        className={`width-peer${peers.length > 8 ? '' : peers.length}`}
+        className={`width-peer${peers.length > 8 ? "" : peers.length}`}
         onClick={expandScreen}
         key={index}
       >
         {writeUserName(peer.userName)}
-        <FaIcon className='fas fa-expand' />
+        <FaIcon className="fas fa-expand" />
         <VideoCard key={index} peer={peer} number={arr.length} />
       </VideoBox>
     );
@@ -212,24 +274,26 @@ const Room = (props) => {
   // BackButton
   const goToBack = (e) => {
     e.preventDefault();
-    socket.emit('BE-leave-room', { roomId, leaver: currentUser });
-    sessionStorage.removeItem('user');
-    window.location.href = '/';
+    socket.emit("BE-leave-room", { roomId, leaver: currentUser });
+    sessionStorage.removeItem("user");
+    navigate("/");
   };
 
   const toggleCameraAudio = (e) => {
-    const target = e.target.getAttribute('data-switch');
+    const target = e.target.getAttribute("data-switch");
 
     setUserVideoAudio((preList) => {
-      let videoSwitch = preList['localUser'].video;
-      let audioSwitch = preList['localUser'].audio;
+      let videoSwitch = preList["localUser"].video;
+      let audioSwitch = preList["localUser"].audio;
 
-      if (target === 'video') {
-        const userVideoTrack = userVideoRef.current.srcObject.getVideoTracks()[0];
+      if (target === "video") {
+        const userVideoTrack =
+          userVideoRef.current.srcObject.getVideoTracks()[0];
         videoSwitch = !videoSwitch;
         userVideoTrack.enabled = videoSwitch;
       } else {
-        const userAudioTrack = userVideoRef.current.srcObject.getAudioTracks()[0];
+        const userAudioTrack =
+          userVideoRef.current.srcObject.getAudioTracks()[0];
         audioSwitch = !audioSwitch;
 
         if (userAudioTrack) {
@@ -245,7 +309,7 @@ const Room = (props) => {
       };
     });
 
-    socket.emit('BE-toggle-camera-audio', { roomId, switchTarget: target });
+    socket.emit("BE-toggle-camera-audio", { roomId, switchTarget: target });
   };
 
   const clickScreenSharing = () => {
@@ -260,7 +324,7 @@ const Room = (props) => {
             peer.replaceTrack(
               peer.streams[0]
                 .getTracks()
-                .find((track) => track.kind === 'video'),
+                .find((track) => track.kind === "video"),
               screenTrack,
               userStream.current
             );
@@ -273,7 +337,7 @@ const Room = (props) => {
                 screenTrack,
                 peer.streams[0]
                   .getTracks()
-                  .find((track) => track.kind === 'video'),
+                  .find((track) => track.kind === "video"),
                 userStream.current
               );
             });
@@ -313,31 +377,44 @@ const Room = (props) => {
     setShowVideoDevices(false);
   };
 
-  const clickCameraDevice = (event) => {
-    if (event && event.target && event.target.dataset && event.target.dataset.value) {
-      const deviceId = event.target.dataset.value;
-      const enabledAudio = userVideoRef.current.srcObject.getAudioTracks()[0].enabled;
+  const clickCameraDevice = async (event) => {
+    try {
+      if (event?.target?.dataset?.value) {
+        const deviceId = event.target.dataset.value;
+        const currentAudioTrack =
+          userVideoRef.current.srcObject.getAudioTracks()[0];
+        const enabledAudio = currentAudioTrack
+          ? currentAudioTrack.enabled
+          : false;
 
-      navigator.mediaDevices
-        .getUserMedia({ video: { deviceId }, audio: enabledAudio })
-        .then((stream) => {
-          const newStreamTrack = stream.getTracks().find((track) => track.kind === 'video');
-          const oldStreamTrack = userStream.current
-            .getTracks()
-            .find((track) => track.kind === 'video');
-
-          userStream.current.removeTrack(oldStreamTrack);
-          userStream.current.addTrack(newStreamTrack);
-
-          peersRef.current.forEach(({ peer }) => {
-            // replaceTrack (oldTrack, newTrack, oldStream);
-            peer.replaceTrack(
-              oldStreamTrack,
-              newStreamTrack,
-              userStream.current
-            );
-          });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId },
+          audio: enabledAudio,
         });
+
+        const newStreamTrack = stream
+          .getTracks()
+          .find((track) => track.kind === "video");
+        const oldStreamTrack = userStream.current
+          .getTracks()
+          .find((track) => track.kind === "video");
+
+        if (oldStreamTrack) {
+          userStream.current.removeTrack(oldStreamTrack);
+          oldStreamTrack.stop();
+        }
+
+        userStream.current.addTrack(newStreamTrack);
+
+        peersRef.current.forEach(({ peer }) => {
+          peer.replaceTrack(oldStreamTrack, newStreamTrack, userStream.current);
+        });
+
+        userVideoRef.current.srcObject = userStream.current;
+      }
+    } catch (e) {
+      console.log("Error switching camera:", e);
+      message.error("Failed to switch camera. Please try again.");
     }
   };
 
@@ -345,25 +422,36 @@ const Room = (props) => {
     <RoomContainer onClick={clickBackground}>
       <VideoAndBarContainer>
         <VideoContainer>
-          {/* Current User Video */}
-          <VideoBox
-            className={`width-peer${peers.length > 8 ? '' : peers.length}`}
-          >
-            {userVideoAudio['localUser'].video ? null : (
-              <UserName>{currentUser}</UserName>
-            )}
-            <FaIcon className='fas fa-expand' />
-            <MyVideo
-              onClick={expandScreen}
-              ref={userVideoRef}
-              muted
-              autoPlay
-              playInline
-            ></MyVideo>
-          </VideoBox>
-          {/* Joined User Vidoe */}
-          {peers &&
-            peers.map((peer, index, arr) => createUserVideo(peer, index, arr))}
+          {mediaError ? (
+            <ErrorMessage>
+              Could not access media devices. Please check your camera and
+              microphone permissions.
+            </ErrorMessage>
+          ) : (
+            <>
+              {/* Current User Video */}
+              <VideoBox
+                className={`width-peer${peers.length > 8 ? "" : peers.length}`}
+              >
+                {userVideoAudio["localUser"].video ? null : (
+                  <UserName>{currentUser}</UserName>
+                )}
+                <FaIcon className="fas fa-expand" />
+                <MyVideo
+                  onClick={expandScreen}
+                  ref={userVideoRef}
+                  muted
+                  autoPlay
+                  playInline
+                ></MyVideo>
+              </VideoBox>
+              {/* Joined User Videos */}
+              {peers &&
+                peers.map((peer, index, arr) =>
+                  createUserVideo(peer, index, arr)
+                )}
+            </>
+          )}
         </VideoContainer>
         <BottomBar
           clickScreenSharing={clickScreenSharing}
@@ -371,11 +459,12 @@ const Room = (props) => {
           clickCameraDevice={clickCameraDevice}
           goToBack={goToBack}
           toggleCameraAudio={toggleCameraAudio}
-          userVideoAudio={userVideoAudio['localUser']}
+          userVideoAudio={userVideoAudio["localUser"]}
           screenShare={screenShare}
           videoDevices={videoDevices}
           showVideoDevices={showVideoDevices}
           setShowVideoDevices={setShowVideoDevices}
+          disabled={mediaError}
         />
       </VideoAndBarContainer>
       <Chat display={displayChat} roomId={roomId} />
@@ -441,6 +530,16 @@ const FaIcon = styled.i`
   position: absolute;
   right: 15px;
   top: 15px;
+`;
+
+const ErrorMessage = styled.div`
+  color: #ff4d4f;
+  text-align: center;
+  padding: 20px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  margin: 20px;
 `;
 
 export default Room;

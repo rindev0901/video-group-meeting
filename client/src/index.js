@@ -8,24 +8,24 @@ import { AuthProvider } from "./contexts/AuthContext";
 
 const root = createRoot(document.getElementById("root"));
 root.render(
-  <React.StrictMode>
-    <ConfigProvider
-      theme={{
-        token: {
-          // Seed Token
-          colorTextBase: "#ffffff",
-          colorTextSecondary: "#e8e8e8",
-          colorPrimary: "#000000",
-          // Alias Token
-          colorBgContainer: "#454552",
-        },
-      }}
-    >
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ConfigProvider>
-  </React.StrictMode>
+  // <React.StrictMode>
+  <ConfigProvider
+    theme={{
+      token: {
+        // Seed Token
+        colorTextBase: "#ffffff",
+        colorTextSecondary: "#e8e8e8",
+        colorPrimary: "#000000",
+        // Alias Token
+        colorBgContainer: "#454552",
+      },
+    }}
+  >
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </ConfigProvider>
+  // </React.StrictMode>
 );
 
 // If you want your app to work offline and load faster, you can change

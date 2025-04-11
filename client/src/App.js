@@ -5,7 +5,7 @@ import Room from "./components/Room/Room";
 import Login from "./components/Auth/Login";
 import Register from "./components/Auth/Register";
 import styled from "styled-components";
-import { theme } from "antd";
+import { App as AntApp, theme } from "antd";
 import { ProtectedRoute } from "./components/Auth/ProtectedRoute";
 import { UnAuthRoute } from "./components/Auth/UnAuthRoute";
 
@@ -13,7 +13,6 @@ const { useToken } = theme;
 
 function App() {
   const { token } = useToken();
-
   const AppContainer = styled.div`
     display: flex;
     flex-direction: column;
@@ -27,44 +26,46 @@ function App() {
   `;
 
   return (
-    <BrowserRouter>
-      <AppContainer>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Main />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/login"
-            element={
-              <UnAuthRoute>
-                <Login />
-              </UnAuthRoute>
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              <UnAuthRoute>
-                <Register />
-              </UnAuthRoute>
-            }
-          />
-          <Route
-            path="/room/:roomId"
-            element={
-              <ProtectedRoute>
-                <Room />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AppContainer>
-    </BrowserRouter>
+    <AntApp>
+      <BrowserRouter>
+        <AppContainer>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Main />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <UnAuthRoute>
+                  <Login />
+                </UnAuthRoute>
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                <UnAuthRoute>
+                  <Register />
+                </UnAuthRoute>
+              }
+            />
+            <Route
+              path="/room/:roomId"
+              element={
+                <ProtectedRoute>
+                  <Room />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AppContainer>
+      </BrowserRouter>
+    </AntApp>
   );
 }
 

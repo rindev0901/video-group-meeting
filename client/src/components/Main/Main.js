@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import socket from "../../socket";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 import {
   Button,
@@ -17,11 +18,13 @@ import {
 const { useToken } = theme;
 const { Text, Title } = Typography;
 
-const Main = (props) => {
+const Main = () => {
+  const navigate = useNavigate();
   const [form] = Form.useForm();
   const [err, setErr] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(socket.connected);
   const { user, logout } = useAuth();
   const { token } = useToken();
 
@@ -32,29 +35,66 @@ const Main = (props) => {
       roomName: "",
     });
 
-    // Socket event listeners
-    socket.on("FE-error-user-exist", ({ error }) => {
+    // Socket connection handlers
+    const onConnect = () => {
+      console.log('Socket connected');
+      setIsConnected(true);
+      setErr(false);
+      setErrMsg("");
+    };
+
+    const onDisconnect = () => {
+      console.log('Socket disconnected');
+      setIsConnected(false);
+      setErr(true);
+      setErrMsg("Connection lost. Please try again.");
+    };
+
+    const onConnectError = (error) => {
+      console.log('Socket connection error:', error);
+      setIsConnected(false);
+      setErr(true);
+      setErrMsg("Unable to connect to server. Please try again later.");
+    };
+
+    // Socket event handlers
+    const onUserExist = ({ error }) => {
       if (!error) {
         const values = form.getFieldsValue();
-        props.history.push(`/room/${values.roomName}`);
+        navigate(`/room/${values.roomName}`);
       } else {
         setErr(true);
         setErrMsg("User name already exists in this room");
-        setLoading(false);
       }
-    });
+      setLoading(false);
+    };
+
+    // Add event listeners
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
+    socket.on("FE-error-user-exist", onUserExist);
 
     // Cleanup
     return () => {
-      socket.off("FE-error-user-exist");
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
+      socket.off("FE-error-user-exist", onUserExist);
     };
-  }, [props.history, form, user?.name]);
+  }, [form, navigate, user?.name]);
 
   const handleJoin = async () => {
     try {
+      if (!isConnected) {
+        setErr(true);
+        setErrMsg("Not connected to server. Please wait or refresh the page.");
+        return;
+      }
+
       setLoading(true);
       const values = await form.validateFields();
-
+      
       if (!values.roomName || !values.userName) {
         setErr(true);
         setErrMsg("Please enter both room name and display name");
@@ -110,6 +150,12 @@ const Main = (props) => {
           Start or Join Meeting
         </Title>
 
+        {!isConnected && (
+          <ConnectionStatus type="warning">
+            Connecting to server...
+          </ConnectionStatus>
+        )}
+
         <Form form={form} layout="vertical" onFinish={handleJoin}>
           <Form.Item
             label="Room Name"
@@ -136,6 +182,7 @@ const Main = (props) => {
               block
               onClick={handleJoin}
               loading={loading}
+              disabled={!isConnected}
               style={{
                 height: "40px",
                 background: token.colorPrimary,
@@ -191,6 +238,12 @@ const UserInfoContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
+`;
+
+const ConnectionStatus = styled(Text)`
+  display: block;
+  text-align: center;
+  margin-bottom: 16px;
 `;
 
 export default Main;

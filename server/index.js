@@ -32,21 +32,26 @@ io.on("connection", (socket) => {
   console.log(`New User connected: ${socket.id}`);
 
   socket.on("disconnect", () => {
-    socket.disconnect();
-    console.log("User disconnected!");
+    delete socketList[socket.id];
+    console.log("User disconnected:", socket.id);
   });
 
   socket.on("BE-check-user", ({ roomId, userName }) => {
+    console.log(`Checking user in room ${roomId}:`, userName);
     let error = false;
 
-    io.sockets.in(roomId).clients((err, clients) => {
-      clients.forEach((client) => {
-        if (socketList[client] == userName) {
+    const room = io.sockets.adapter.rooms.get(roomId);
+    if (room) {
+      for (const clientId of room) {
+        if (socketList[clientId]?.userName === userName) {
           error = true;
+          break;
         }
-      });
-      socket.emit("FE-error-user-exist", { error });
-    });
+      }
+    }
+
+    console.log("User exists?", error);
+    socket.emit("FE-error-user-exist", { error });
   });
 
   /**
@@ -112,6 +117,11 @@ io.on("connection", (socket) => {
   });
 });
 
+// Error handling for socket.io
+io.engine.on("connection_error", (err) => {
+  console.log("Socket.io connection error:", err);
+});
+
 http.listen(PORT, () => {
-  console.log("Connected : 3001");
+  console.log(`Server running on port: ${PORT}`);
 });
