@@ -63,19 +63,20 @@ io.on("connection", (socket) => {
     socketList[socket.id] = { userName, video: true, audio: true };
 
     // Set User List
-    io.sockets.in(roomId).clients((err, clients) => {
-      try {
-        const users = [];
-        clients.forEach((client) => {
+    const room = io.sockets.adapter.rooms.get(roomId);
+    try {
+      const users = [];
+      if (room) {
+        for (const clientId of room) {
           // Add User List
-          users.push({ userId: client, info: socketList[client] });
-        });
-        socket.broadcast.to(roomId).emit("FE-user-join", users);
-        // io.sockets.in(roomId).emit('FE-user-join', users);
-      } catch (e) {
-        io.sockets.in(roomId).emit("FE-error-user-exist", { err: true });
+          users.push({ userId: clientId, info: socketList[clientId] });
+        }
       }
-    });
+      socket.broadcast.to(roomId).emit("FE-user-join", users);
+    } catch (e) {
+      console.error("Error in BE-join-room:", e);
+      io.sockets.in(roomId).emit("FE-error-user-exist", { err: true });
+    }
   });
 
   socket.on("BE-call-user", ({ userToCall, from, signal }) => {
