@@ -42,8 +42,32 @@ export default function Register() {
       const data = await res.json();
       console.log("registerResponse:::", data);
 
-      if (!res.ok || !data.success)
+      if (!res.ok || !data.success) {
+        if (data.data) {
+          const errorContent = (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+              }}
+            >
+              {data.data.map((error, index) => (
+                <div key={index}>{error}</div>
+              ))}
+            </div>
+          );
+          message.error({
+            content: errorContent,
+            style: {
+              marginTop: "20px",
+            },
+            duration: 5,
+          });
+          return;
+        }
         throw new Error(data?.message || "Something went wrong!");
+      }
 
       message.success(data.message);
 
@@ -62,7 +86,7 @@ export default function Register() {
       padding: screens.md
         ? `${token.paddingXL}px`
         : `${token.sizeXXL}px ${token.sizeXXL}px`,
-      width: '300px'
+      width: "300px",
     },
     forgotPassword: {
       float: "right",
@@ -186,8 +210,14 @@ export default function Register() {
           </Form.Item>
 
           <Form.Item style={{ marginBottom: "0px" }}>
-            <Button block type="primary" htmlType="submit" disabled={isSignIn}>
-              {isSignIn ? <Spin /> : " Sign up"}
+            <Button
+              block
+              type="primary"
+              htmlType="submit"
+              loading={isSignIn}
+              disabled={isSignIn}
+            >
+              Sign up
             </Button>
             <div style={styles.signup}>
               <Text style={styles.text}>Already have an account?</Text>{" "}

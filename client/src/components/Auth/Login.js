@@ -152,9 +152,10 @@ export default function Login() {
               block="true"
               type="primary"
               htmlType="submit"
+              loading={isLoggingIn}
               disabled={isLoggingIn}
             >
-              {isLoggingIn ? <Spin /> : "Log in"}
+              Log in
             </Button>
             <div style={styles.footer}>
               <Text style={styles.text}>Don't have an account?</Text>{" "}
