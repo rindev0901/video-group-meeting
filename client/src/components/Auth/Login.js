@@ -27,6 +27,8 @@ export default function Login() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
 
+  console.log(process.env.NODE_ENV);
+
   const onFinish = async (values) => {
     setIsLoggingIn(true);
 
@@ -63,7 +65,7 @@ export default function Login() {
       padding: screens.md
         ? `${token.paddingXL}px`
         : `${token.sizeXXL}px ${token.sizeXXL}px`,
-        width: '300px'
+      width: "300px",
     },
     footer: {
       marginTop: token.marginLG,

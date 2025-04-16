@@ -82,7 +82,7 @@ const Room = () => {
     userVideoRef.current.srcObject = stream;
     userStream.current = stream;
 
-    socket.emit("BE-join-room", { roomId, userName: currentUser });
+    socket.emit("BE-join-room", { roomId, userName: currentUser.name });
   };
 
   useEffect(() => {
@@ -109,7 +109,7 @@ const Room = () => {
       users.forEach(({ userId, info }) => {
         let { userName, video, audio } = info;
 
-        if (userName !== currentUser) {
+        if (userName !== currentUser.name) {
           const peer = createPeer(userId, socket.id, userStream.current);
           peer.userName = userName;
           peer.peerID = userId;
@@ -274,7 +274,7 @@ const Room = () => {
   // BackButton
   const goToBack = (e) => {
     e.preventDefault();
-    socket.emit("BE-leave-room", { roomId, leaver: currentUser });
+    socket.emit("BE-leave-room", { roomId, leaver: currentUser.name });
     sessionStorage.removeItem("user");
     navigate("/");
   };
@@ -434,7 +434,7 @@ const Room = () => {
                 className={`width-peer${peers.length > 8 ? "" : peers.length}`}
               >
                 {userVideoAudio["localUser"].video ? null : (
-                  <UserName>{currentUser}</UserName>
+                  <UserName>{currentUser.name}</UserName>
                 )}
                 <FaIcon className="fas fa-expand" />
                 <MyVideo
