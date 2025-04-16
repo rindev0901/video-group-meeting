@@ -6,6 +6,8 @@ import Login from "./components/Auth/Login";
 import Register from "./components/Auth/Register";
 import styled from "styled-components";
 import { theme } from "antd";
+import { ProtectedRoute } from "./components/Auth/ProtectedRoute";
+import { UnAuthRoute } from "./components/Auth/UnAuthRoute";
 
 const { useToken } = theme;
 
@@ -28,10 +30,38 @@ function App() {
     <BrowserRouter>
       <AppContainer>
         <Routes>
-          <Route path="/" element={<Main />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/room/:roomId" element={<Room />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Main />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <UnAuthRoute>
+                <Login />
+              </UnAuthRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <UnAuthRoute>
+                <Register />
+              </UnAuthRoute>
+            }
+          />
+          <Route
+            path="/room/:roomId"
+            element={
+              <ProtectedRoute>
+                <Room />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </AppContainer>
     </BrowserRouter>

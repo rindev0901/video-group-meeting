@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
 import { ConfigProvider } from "antd";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const root = createRoot(document.getElementById("root"));
 root.render(
@@ -20,7 +21,9 @@ root.render(
         },
       }}
     >
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </ConfigProvider>
   </React.StrictMode>
 );

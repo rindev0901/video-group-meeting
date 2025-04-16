@@ -7,12 +7,14 @@ import {
   Image,
   Input,
   message,
+  Spin,
   theme,
   Typography,
 } from "antd";
 
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 const { useToken } = theme;
 const { useBreakpoint } = Grid;
@@ -21,7 +23,9 @@ const { Text, Title } = Typography;
 export default function Login() {
   const { token } = useToken();
   const screens = useBreakpoint();
+  const { login } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const navigate = useNavigate();
 
   const onFinish = async (values) => {
     setIsLoggingIn(true);
@@ -42,7 +46,9 @@ export default function Login() {
 
       if (!res.ok || !data.success) throw new Error(data?.message);
 
-      // Do something with the response
+      login(data?.data);
+
+      navigate("/");
     } catch (error) {
       console.error("Server error:::", error);
       message.error(error?.message ?? "Something went wrong!");
@@ -103,6 +109,7 @@ export default function Login() {
           </Text>
         </div>
         <Form
+          disabled={isLoggingIn}
           name="normal_login"
           initialValues={{
             remember: true,
@@ -145,7 +152,7 @@ export default function Login() {
               htmlType="submit"
               disabled={isLoggingIn}
             >
-              Log in
+              {isLoggingIn ? <Spin /> : "Log in"}
             </Button>
             <div style={styles.footer}>
               <Text style={styles.text}>Don't have an account?</Text>{" "}

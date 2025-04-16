@@ -7,12 +7,13 @@ import {
   Image,
   Input,
   message,
+  Spin,
   theme,
   Typography,
 } from "antd";
 
 import { LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const { useToken } = theme;
 const { useBreakpoint } = Grid;
@@ -20,6 +21,7 @@ const { Text, Title } = Typography;
 
 export default function Register() {
   const { token } = useToken();
+  const navigate = useNavigate();
   const screens = useBreakpoint();
   const [isSignIn, setIsSignIn] = useState(false);
 
@@ -40,11 +42,15 @@ export default function Register() {
       const data = await res.json();
       console.log("registerResponse:::", data);
 
-      if (!res.ok || !data.success) throw new Error(data?.message);
-      // Do something with the response
+      if (!res.ok || !data.success)
+        throw new Error(data?.message || "Something went wrong!");
+
+      message.success(data.message);
+
+      navigate("/login");
     } catch (error) {
       console.error("Server error:::", error);
-      message.error(error?.message ?? "Something went wrong!");
+      message.error(error?.message || "Something went wrong!");
     } finally {
       setIsSignIn(false);
     }
@@ -181,7 +187,7 @@ export default function Register() {
 
           <Form.Item style={{ marginBottom: "0px" }}>
             <Button block type="primary" htmlType="submit" disabled={isSignIn}>
-              Sign up
+              {isSignIn ? <Spin /> : " Sign up"}
             </Button>
             <div style={styles.signup}>
               <Text style={styles.text}>Already have an account?</Text>{" "}
