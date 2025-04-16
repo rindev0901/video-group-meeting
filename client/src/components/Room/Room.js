@@ -275,7 +275,6 @@ const Room = () => {
   const goToBack = (e) => {
     e.preventDefault();
     socket.emit("BE-leave-room", { roomId, leaver: currentUser.name });
-    sessionStorage.removeItem("user");
     navigate("/");
   };
 
