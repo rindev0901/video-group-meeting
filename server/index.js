@@ -103,7 +103,7 @@ io.on("connection", (socket) => {
     socket.broadcast
       .to(roomId)
       .emit("FE-user-leave", { userId: socket.id, userName: [socket.id] });
-    io.sockets.sockets[socket.id].leave(roomId);
+    socket.leave(roomId);
   });
 
   socket.on("BE-toggle-camera-audio", ({ roomId, switchTarget }) => {
