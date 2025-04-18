@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   Button,
+  Divider,
   Form,
   Grid,
   Image,
@@ -12,7 +13,12 @@ import {
   Typography,
 } from "antd";
 
-import { LockOutlined, MailOutlined } from "@ant-design/icons";
+import {
+  GithubOutlined,
+  GoogleOutlined,
+  LockOutlined,
+  MailOutlined,
+} from "@ant-design/icons";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -59,6 +65,62 @@ export default function Login() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setIsLoggingIn(true);
+
+    try {
+      // Redirect to Google OAuth endpoint
+      window.open(
+        `${process.env.REACT_APP_BE_BASE_URL}/auth/google/redirect`,
+        "googleLogin",
+        "width=500,height=600"
+      );
+    } catch (error) {
+      console.error("Google login error:", error);
+      message.error("Failed to connect with Google. Please try again.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  useEffect(() => {
+    // Lắng nghe sự kiện 'message' từ popup
+
+    const handleCallbackSocial = (event) => {
+      if (event.origin !== process.env.REACT_APP_BE_BASE_URL) return; // Kiểm tra nguồn
+
+      const socialLoginData = JSON.parse(event.data);
+
+      login(socialLoginData.data);
+
+      navigate("/");
+    };
+
+    window.addEventListener("message", handleCallbackSocial);
+
+    return () => {
+      window.removeEventListener("message", handleCallbackSocial);
+    };
+  }, []);
+
+  const handleGithubLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      setIsLoggingIn(true);
+
+      // Redirect to Google OAuth endpoint
+      window.open(
+        `${process.env.REACT_APP_BE_BASE_URL}/auth/github/redirect`,
+        "googleLogin",
+        "width=500,height=600"
+      );
+    } catch (error) {
+      console.error("GitHub login error:", error);
+      message.error("Failed to connect with GitHub. Please try again.");
+      setIsLoggingIn(false);
+    }
+  };
+
   const styles = {
     container: {
       margin: "0 auto",
@@ -96,6 +158,16 @@ export default function Login() {
       color: token.colorTextSecondary,
       fontWeight: 700,
     },
+    socialButton: {
+      width: "100%",
+      marginBottom: token.marginSM,
+    },
+    socialButtonsContainer: {
+      marginBottom: token.marginMD,
+    },
+    divider: {
+      margin: `${token.marginMD}px 0`,
+    },
   };
 
   return (
@@ -110,6 +182,7 @@ export default function Login() {
             in.
           </Text>
         </div>
+
         <Form
           disabled={isLoggingIn}
           name="normal_login"
@@ -157,6 +230,28 @@ export default function Login() {
             >
               Log in
             </Button>
+            <Divider style={styles.divider}>or</Divider>
+
+            <div style={styles.socialButtonsContainer}>
+              <Button
+                type="default"
+                icon={<GoogleOutlined />}
+                style={styles.socialButton}
+                onClick={handleGoogleLogin}
+                disabled={isLoggingIn}
+              >
+                Continue with Google
+              </Button>
+              <Button
+                type="default"
+                icon={<GithubOutlined />}
+                style={styles.socialButton}
+                onClick={handleGithubLogin}
+                disabled={isLoggingIn}
+              >
+                Continue with GitHub
+              </Button>
+            </div>
             <div style={styles.footer}>
               <Text style={styles.text}>Don't have an account?</Text>{" "}
               <Link to="/register" style={styles.link}>
