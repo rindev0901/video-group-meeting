@@ -37,21 +37,21 @@ const Main = () => {
 
     // Socket connection handlers
     const onConnect = () => {
-      console.log('Socket connected');
+      console.log("Socket connected");
       setIsConnected(true);
       setErr(false);
       setErrMsg("");
     };
 
     const onDisconnect = () => {
-      console.log('Socket disconnected');
+      console.log("Socket disconnected");
       setIsConnected(false);
       setErr(true);
       setErrMsg("Connection lost. Please try again.");
     };
 
     const onConnectError = (error) => {
-      console.log('Socket connection error:', error);
+      console.log("Socket connection error:", error);
       setIsConnected(false);
       setErr(true);
       setErrMsg("Unable to connect to server. Please try again later.");
@@ -70,16 +70,16 @@ const Main = () => {
     };
 
     // Add event listeners
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('connect_error', onConnectError);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("FE-error-user-exist", onUserExist);
 
     // Cleanup
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('connect_error', onConnectError);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("FE-error-user-exist", onUserExist);
     };
   }, [form, navigate, user?.name]);
@@ -94,7 +94,7 @@ const Main = () => {
 
       setLoading(true);
       const values = await form.validateFields();
-      
+
       if (!values.roomName || !values.userName) {
         setErr(true);
         setErrMsg("Please enter both room name and display name");
@@ -117,9 +117,16 @@ const Main = () => {
     <PageContainer>
       <MainCard>
         <UserCard>
-          <Avatar size={48} style={{ background: token.colorPrimary }}>
-            {user.name.charAt(0).toUpperCase()}
-          </Avatar>
+          <Avatar
+            size={48}
+            src={
+              user?.avatar
+                ? user?.avatar
+                : user?.user_metadata?.avatar
+                ? user?.user_metadata?.avatar
+                : user?.name?.charAt(0).toUpperCase()
+            }
+          ></Avatar>
           <UserInfoContainer>
             <Title level={4} style={{ margin: 0 }}>
               {user.name}

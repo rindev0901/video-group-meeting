@@ -15,12 +15,14 @@ export const AuthProvider = ({ children }) => {
     return storedUser ? JSON.parse(storedUser) : null;
   });
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     // Check if user data exists in localStorage
-    const storedUser = localStorage.getItem("user");
+    const storedUser = JSON.parse(localStorage.getItem("user"));
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      setUser({
+        ...storedUser,
+        user_metadata: JSON.parse(storedUser.user_metadata),
+      });
     }
     setLoading(false);
   }, []);
