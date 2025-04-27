@@ -17,12 +17,21 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     // Check if user data exists in localStorage
-    const storedUser = JSON.parse(localStorage.getItem("user"));
+    const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser({
-        ...storedUser,
-        user_metadata: JSON.parse(storedUser.user_metadata),
-      });
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser({
+          ...parsedUser,
+          user_metadata: typeof parsedUser.user_metadata === 'string' 
+            ? JSON.parse(parsedUser.user_metadata) 
+            : parsedUser.user_metadata || {}
+        });
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        localStorage.removeItem("user"); // Clear invalid data
+        setUser(null);
+      }
     }
     setLoading(false);
   }, []);
