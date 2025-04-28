@@ -74,7 +74,7 @@ const MemberItem = styled(List.Item)`
   transition: background-color 0.3s;
 
   &:hover {
-    background-color: #f5f5f5;
+    background-color: transparent;
   }
 `;
 
