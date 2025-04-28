@@ -980,7 +980,7 @@ export default function TeamDetail() {
                               {formatDate(meeting.scheduled_at)} at{" "}
                               {formatTime(meeting.scheduled_at)}
                             </Text>
-                            <Text type="secondary" style={{ color: "#000" }}>
+                            <Text type="secondary">
                               Created by {meeting.created_by || team.owner.name}
                             </Text>
                             {meeting.description && (
