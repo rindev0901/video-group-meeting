@@ -4,6 +4,8 @@ import Main from "./components/Main/Main";
 import Room from "./components/Room/Room";
 import Login from "./components/Auth/Login";
 import Register from "./components/Auth/Register";
+import Teams from "./components/Teams/Teams";
+import TeamDetail from "./components/Teams/TeamDetail";
 import styled from "styled-components";
 import { App as AntApp, theme } from "antd";
 import { ProtectedRoute } from "./components/Auth/ProtectedRoute";
@@ -59,6 +61,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Room />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams"
+              element={
+                <ProtectedRoute>
+                  <Teams />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/team/:teamId"
+              element={
+                <ProtectedRoute>
+                  <TeamDetail />
                 </ProtectedRoute>
               }
             />

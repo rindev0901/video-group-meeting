@@ -199,6 +199,23 @@ const Main = () => {
             </Button>
           </Form.Item>
         </Form>
+
+        <Divider>Or</Divider>
+        
+        <Button 
+          type="default" 
+          size="large" 
+          block
+          onClick={() => navigate('/teams')}
+          style={{
+            height: "40px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          View My Teams
+        </Button>
       </MainCard>
     </PageContainer>
   );
