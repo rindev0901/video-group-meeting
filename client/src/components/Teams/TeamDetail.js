@@ -15,6 +15,7 @@ import {
   Space,
   Tooltip,
   Popconfirm,
+  Collapse,
 } from "antd";
 import {
   TeamOutlined,
@@ -28,6 +29,10 @@ import {
   CheckOutlined,
   CloseOutlined,
   DeleteOutlined,
+  FileTextOutlined,
+  EditFilled,
+  LockOutlined,
+  UnlockOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import styled from "styled-components";
@@ -100,6 +105,16 @@ const formatTime = (dateString) => {
   }
 };
 
+// Helper to determine if a note belongs to the current user
+const isCurrentUserNote = (note, currentUser) => {
+  return note.user?.id === currentUser?.id;
+};
+
+// Helper to determine if a note belongs to the team owner
+const isTeamOwnerNote = (note, team) => {
+  return note.user?.id === team?.owner?.id;
+};
+
 export default function TeamDetail() {
   const { teamId } = useParams();
   const navigate = useNavigate();
@@ -126,6 +141,27 @@ export default function TeamDetail() {
   const [currentMeeting, setCurrentMeeting] = useState(null);
   const [editMeetingForm] = Form.useForm();
 
+  // Add state for deleting meeting
+  const [deletingMeetingId, setDeletingMeetingId] = useState(null);
+
+  // Add state for meeting details and notes
+  const [meetingDetails, setMeetingDetails] = useState({});
+
+  // Add state for note editing
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteContent, setNoteContent] = useState("");
+  const [noteForm] = Form.useForm();
+  const [isUpdatingNote, setIsUpdatingNote] = useState(false);
+  const [isDeletingNote, setIsDeletingNote] = useState(false);
+
+  // Add state for note visibility
+  const [noteVisibility, setNoteVisibility] = useState(true);
+
+  // Add state for new note
+  const [newNoteForm] = Form.useForm();
+  const [addingNote, setAddingNote] = useState(false);
+  const [creatingNote, setCreatingNote] = useState(false);
+
   useEffect(() => {
     // Fetch team details from the API
     const fetchTeam = async () => {
@@ -149,9 +185,6 @@ export default function TeamDetail() {
           // Initially set meetings from team data
           if (data.data.meetings) {
             setMeetings(data.data.meetings);
-          } else {
-            // If meetings not included in team data, fetch them separately
-            fetchTeamMeetings();
           }
         } else {
           // Show error from API if available
@@ -260,9 +293,6 @@ export default function TeamDetail() {
         // Add the new meeting to the list
         if (data.data) {
           setMeetings([...meetings, data.data]);
-        } else {
-          // Refetch meetings to get the updated list
-          fetchTeamMeetings();
         }
       } else {
         message.error(data.message || "Failed to create meeting");
@@ -428,9 +458,6 @@ export default function TeamDetail() {
               meeting.id === currentMeeting.id ? data.data : meeting
             )
           );
-        } else {
-          // Refetch meetings if the response doesn't include the updated meeting
-          fetchTeamMeetings();
         }
       } else {
         message.error(data?.data || data.message || "Failed to update meeting");
@@ -450,6 +477,252 @@ export default function TeamDetail() {
       description: meeting.description || "",
     });
     setEditMeetingModalVisible(true);
+  };
+
+  // Function to handle meeting deletion
+  const handleDeleteMeeting = async (meetingId) => {
+    setDeletingMeetingId(meetingId);
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/meetings/${meetingId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        message.success(data.message || "Meeting deleted successfully");
+
+        // Remove the deleted meeting from the local state
+        setMeetings(meetings.filter((meeting) => meeting.id !== data.data));
+      } else {
+        message.error(data?.data || data.message || "Failed to delete meeting");
+      }
+    } catch (error) {
+      console.error("Error deleting meeting:", error);
+      message.error("Error connecting to server");
+    } finally {
+      setDeletingMeetingId(null);
+    }
+  };
+
+  // Function to fetch meeting details including notes
+  const fetchMeetingDetails = async (meetingId) => {
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/meetings/${meetingId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Store meeting details in state
+        const meetingData = data.data;
+        // If the API response format has changed to include meeting and user_notes separately
+        if (meetingData.meeting && meetingData.user_notes) {
+          setMeetingDetails((prevDetails) => ({
+            ...prevDetails,
+            [meetingId]: {
+              ...meetingData.meeting,
+              user_notes: meetingData.user_notes
+            },
+          }));
+        } else {
+          // Original format
+          setMeetingDetails((prevDetails) => ({
+            ...prevDetails,
+            [meetingId]: data.data,
+          }));
+        }
+        return data.data;
+      } else {
+        console.error("Failed to fetch meeting details:", data.message);
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching meeting details:", error);
+      return null;
+    }
+  };
+
+  // Function to handle note update
+  const handleUpdateNote = async (noteId, meetingId) => {
+    setIsUpdatingNote(true);
+    try {
+      const values = await noteForm.validateFields();
+      
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/notes/${noteId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+          body: JSON.stringify({
+            content: values.content,
+            is_public: values.is_public
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        message.success(data.message || "Note updated successfully");
+        
+        // Update the note in local state
+        setMeetingDetails((prevDetails) => {
+          const updatedMeeting = { ...prevDetails[meetingId] };
+          updatedMeeting.user_notes = updatedMeeting.user_notes.map(note => 
+            note.id === noteId 
+              ? { 
+                  ...note, 
+                  content: values.content,
+                  is_public: values.is_public,
+                  updated_at: new Date().toISOString() 
+                } 
+              : note
+          );
+          
+          return {
+            ...prevDetails,
+            [meetingId]: updatedMeeting
+          };
+        });
+        
+        // Reset editing state
+        setEditingNoteId(null);
+        setNoteContent("");
+      } else {
+        message.error(data.message || "Failed to update note");
+      }
+    } catch (error) {
+      console.error("Error updating note:", error);
+      message.error("Error connecting to server");
+    } finally {
+      setIsUpdatingNote(false);
+    }
+  };
+
+  // Function to handle note deletion
+  const handleDeleteNote = async (noteId, meetingId) => {
+    setIsDeletingNote(true);
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/notes/${noteId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        message.success(data.message || "Note deleted successfully");
+        
+        // Remove the deleted note from local state
+        setMeetingDetails((prevDetails) => {
+          const updatedMeeting = { ...prevDetails[meetingId] };
+          updatedMeeting.user_notes = updatedMeeting.user_notes.filter(
+            note => note.id !== noteId
+          );
+          
+          return {
+            ...prevDetails,
+            [meetingId]: updatedMeeting
+          };
+        });
+      } else {
+        message.error(data.message || "Failed to delete note");
+      }
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      message.error("Error connecting to server");
+    } finally {
+      setIsDeletingNote(false);
+    }
+  };
+
+  // Function to handle note creation
+  const handleCreateNote = async (meetingId) => {
+    setCreatingNote(true);
+    try {
+      const values = await newNoteForm.validateFields();
+      
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/notes`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+          body: JSON.stringify({
+            meeting_id: meetingId,
+            content: values.content,
+            is_public: values.is_public || true
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        message.success(data.message || "Note created successfully");
+        
+        // Add the new note to the meeting in local state
+        if (data.data) {
+          setMeetingDetails((prevDetails) => {
+            const updatedMeeting = { ...prevDetails[meetingId] };
+            
+            // Ensure user_notes is initialized as an array
+            if (!updatedMeeting.user_notes) {
+              updatedMeeting.user_notes = [];
+            }
+            
+            // Add the new note with user info
+            updatedMeeting.user_notes.push({
+              ...data.data,
+              user: currentUser
+            });
+            
+            return {
+              ...prevDetails,
+              [meetingId]: updatedMeeting
+            };
+          });
+        }
+        
+        // Reset form and state
+        newNoteForm.resetFields();
+        setAddingNote(false);
+      } else {
+        message.error(data.message || "Failed to create note");
+      }
+    } catch (error) {
+      console.error("Error creating note:", error);
+      message.error("Error connecting to server");
+    } finally {
+      setCreatingNote(false);
+    }
   };
 
   if (loading) {
@@ -606,7 +879,11 @@ export default function TeamDetail() {
                   style: { backgroundColor: "#ff4d4f", borderColor: "#ff4d4f" },
                 }}
               >
-                <Button icon={<DeleteOutlined />} danger>
+                <Button
+                  icon={<DeleteOutlined />}
+                  danger
+                  style={{ boxShadow: "none" }}
+                >
                   Remove Team
                 </Button>
               </Popconfirm>
@@ -657,6 +934,41 @@ export default function TeamDetail() {
                             Edit
                           </Button>
                         ),
+                        isOwner && (
+                          <Popconfirm
+                            title={
+                              <span style={{ color: "#faad14" }}>
+                                Delete this meeting?
+                              </span>
+                            }
+                            description={
+                              <span style={{ color: "#faad14" }}>
+                                This action cannot be undone.
+                              </span>
+                            }
+                            onConfirm={() => handleDeleteMeeting(meeting.id)}
+                            okText="Delete"
+                            cancelText="Cancel"
+                            okButtonProps={{
+                              loading: deletingMeetingId === meeting.id,
+                              danger: true,
+                              style: {
+                                backgroundColor: "#ff4d4f",
+                                borderColor: "#ff4d4f",
+                              },
+                            }}
+                          >
+                            <Button
+                              type="default"
+                              style={{ boxShadow: "none" }}
+                              danger
+                              icon={<DeleteOutlined />}
+                              loading={deletingMeetingId === meeting.id}
+                            >
+                              Delete
+                            </Button>
+                          </Popconfirm>
+                        ),
                       ].filter(Boolean)}
                     >
                       <List.Item.Meta
@@ -668,12 +980,12 @@ export default function TeamDetail() {
                         }
                         title={meeting.title}
                         description={
-                          <Space direction="vertical">
+                          <Space direction="vertical" style={{ width: "100%" }}>
                             <Text>
                               {formatDate(meeting.scheduled_at)} at{" "}
                               {formatTime(meeting.scheduled_at)}
                             </Text>
-                            <Text type="secondary">
+                            <Text type="secondary" style={{color: "#000"}}>
                               Created by {meeting.created_by || team.owner.name}
                             </Text>
                             {meeting.description && (
@@ -684,6 +996,331 @@ export default function TeamDetail() {
                                 {meeting.description}
                               </Text>
                             )}
+
+                            {/* Notes Collapse Section */}
+                            <Collapse
+                              bordered={false}
+                              style={{ background: "#f9f9f9", marginTop: 10 }}
+                              expandIcon={({ isActive }) => (
+                                <FileTextOutlined rotate={isActive ? 90 : 0} />
+                              )}
+                              onChange={() => {
+                                // Fetch meeting details if not already loaded
+                                if (!meetingDetails[meeting.id]) {
+                                  fetchMeetingDetails(meeting.id);
+                                }
+                              }}
+                            >
+                              <Collapse.Panel
+                                header={
+                                  <span
+                                    style={{ color: "#000", fontWeight: 700 }}
+                                  >
+                                    Meeting Notes
+                                  </span>
+                                }
+                                key="1"
+                              >
+                                {!meetingDetails[meeting.id] ? (
+                                  <Skeleton active paragraph={{ rows: 2 }} />
+                                ) : (
+                                  <>
+                                    {/* Add Note Form */}
+                                    {addingNote ? (
+                                      <Form
+                                        form={newNoteForm}
+                                        style={{ marginBottom: 16 }}
+                                        initialValues={{ 
+                                          content: '',
+                                          is_public: true
+                                        }}
+                                        onFinish={() => handleCreateNote(meeting.id)}
+                                      >
+                                        <Form.Item 
+                                          name="content"
+                                          rules={[{ required: true, message: "Note content cannot be empty" }]}
+                                          style={{ marginBottom: 8 }}
+                                        >
+                                          <Input.TextArea 
+                                            autoFocus
+                                            rows={2}
+                                            placeholder="Type your note here..."
+                                          />
+                                        </Form.Item>
+                                        <Form.Item
+                                          name="is_public"
+                                          valuePropName="checked"
+                                          style={{ marginBottom: 8 }}
+                                        >
+                                          <Tooltip title="When public, all team members can see this note" color="#000">
+                                            <span>
+                                              <Input.Group compact>
+                                                <Button
+                                                  icon={newNoteForm.getFieldValue('is_public') ? <UnlockOutlined /> : <LockOutlined />}
+                                                  onClick={() => {
+                                                    const currentValue = newNoteForm.getFieldValue('is_public');
+                                                    newNoteForm.setFieldValue('is_public', !currentValue);
+                                                  }}
+                                                  style={{ 
+                                                    borderRadius: '4px 0 0 4px',
+                                                    backgroundColor: newNoteForm.getFieldValue('is_public') ? '#87d068' : '#f5f5f5',
+                                                    borderColor: newNoteForm.getFieldValue('is_public') ? '#87d068' : '#d9d9d9',
+                                                    color: newNoteForm.getFieldValue('is_public') ? '#fff' : 'rgba(0, 0, 0, 0.45)',
+                                                  }}
+                                                  size="small"
+                                                />
+                                                <Button
+                                                  style={{
+                                                    borderRadius: '0 4px 4px 0',
+                                                    marginLeft: '-1px',
+                                                    backgroundColor: newNoteForm.getFieldValue('is_public') ? '#87d068' : '#f5f5f5',
+                                                    borderColor: newNoteForm.getFieldValue('is_public') ? '#87d068' : '#d9d9d9',
+                                                    color: newNoteForm.getFieldValue('is_public') ? '#fff' : 'rgba(0, 0, 0, 0.45)',
+                                                  }}
+                                                  size="small"
+                                                >
+                                                  {newNoteForm.getFieldValue('is_public') ? 'Public' : 'Private'}
+                                                </Button>
+                                              </Input.Group>
+                                            </span>
+                                          </Tooltip>
+                                        </Form.Item>
+                                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                                          <Button 
+                                            size="small" 
+                                            onClick={() => setAddingNote(false)}
+                                          >
+                                            Cancel
+                                          </Button>
+                                          <Button 
+                                            type="primary" 
+                                            size="small" 
+                                            htmlType="submit"
+                                            loading={creatingNote}
+                                            style={{ backgroundColor: "#000000", borderColor: "#000000" }}
+                                          >
+                                            Add Note
+                                          </Button>
+                                        </div>
+                                      </Form>
+                                    ) : (
+                                      <Button 
+                                        type="dashed" 
+                                        block 
+                                        onClick={() => setAddingNote(true)}
+                                        style={{ marginBottom: 16 }}
+                                        icon={<FileTextOutlined />}
+                                      >
+                                        Add Note
+                                      </Button>
+                                    )}
+                                    
+                                    {/* Note List */}
+                                    {meetingDetails[meeting.id].user_notes &&
+                                    meetingDetails[meeting.id].user_notes.length >
+                                      0 ? (
+                                      <List
+                                        size="small"
+                                        dataSource={
+                                          meetingDetails[meeting.id].user_notes
+                                        }
+                                        style={{ 
+                                          maxHeight: '300px', 
+                                          overflowY: 'auto', 
+                                          padding: '0 5px',
+                                          border: '1px solid #f0f0f0',
+                                          borderRadius: '4px'
+                                        }}
+                                        renderItem={(note) => (
+                                          <List.Item
+                                            actions={[
+                                              <Button
+                                                type="text"
+                                                icon={<EditFilled />}
+                                                size="small"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setEditingNoteId(note.id);
+                                                  setNoteContent(note.content);
+                                                  noteForm.setFieldsValue({ 
+                                                    content: note.content,
+                                                    is_public: note.is_public
+                                                  });
+                                                }}
+                                                style={{ color: "#1890ff" }}
+                                              />,
+                                              <Popconfirm
+                                                title="Delete this note?"
+                                                description="This action cannot be undone."
+                                                onConfirm={() => handleDeleteNote(note.id, meeting.id)}
+                                                okText="Delete"
+                                                cancelText="Cancel"
+                                                okButtonProps={{
+                                                  loading: isDeletingNote,
+                                                  danger: true,
+                                                }}
+                                              >
+                                                <Button
+                                                  type="text"
+                                                  icon={<DeleteOutlined />}
+                                                  size="small"
+                                                  style={{ color: "#ff4d4f" }}
+                                                />
+                                              </Popconfirm>
+                                            ]}
+                                          >
+                                            {editingNoteId === note.id ? (
+                                              <Form
+                                                form={noteForm}
+                                                style={{ width: "100%" }}
+                                                initialValues={{ 
+                                                  content: note.content,
+                                                  is_public: note.is_public
+                                                }}
+                                                onFinish={() => handleUpdateNote(note.id, meeting.id)}
+                                              >
+                                                <Form.Item 
+                                                  name="content"
+                                                  rules={[{ required: true, message: "Note content cannot be empty" }]}
+                                                  style={{ marginBottom: 8 }}
+                                                >
+                                                  <Input.TextArea 
+                                                    autoFocus
+                                                    rows={2}
+                                                    onPressEnter={(e) => {
+                                                      if (!e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleUpdateNote(note.id, meeting.id);
+                                                      }
+                                                    }}
+                                                  />
+                                                </Form.Item>
+                                                <Form.Item
+                                                  name="is_public"
+                                                  valuePropName="checked"
+                                                  style={{ marginBottom: 8 }}
+                                                >
+                                                  <Tooltip title="When public, all team members can see this note" color="#000">
+                                                    <span>
+                                                      <Input.Group compact>
+                                                        <Button
+                                                          icon={noteForm.getFieldValue('is_public') ? <UnlockOutlined /> : <LockOutlined />}
+                                                          onClick={() => {
+                                                            const currentValue = noteForm.getFieldValue('is_public');
+                                                            noteForm.setFieldValue('is_public', !currentValue);
+                                                          }}
+                                                          style={{ 
+                                                            borderRadius: '4px 0 0 4px',
+                                                            backgroundColor: noteForm.getFieldValue('is_public') ? '#87d068' : '#f5f5f5',
+                                                            borderColor: noteForm.getFieldValue('is_public') ? '#87d068' : '#d9d9d9',
+                                                            color: noteForm.getFieldValue('is_public') ? '#fff' : 'rgba(0, 0, 0, 0.45)',
+                                                          }}
+                                                          size="small"
+                                                        />
+                                                        <Button
+                                                          style={{
+                                                            borderRadius: '0 4px 4px 0',
+                                                            marginLeft: '-1px',
+                                                            backgroundColor: noteForm.getFieldValue('is_public') ? '#87d068' : '#f5f5f5',
+                                                            borderColor: noteForm.getFieldValue('is_public') ? '#87d068' : '#d9d9d9',
+                                                            color: noteForm.getFieldValue('is_public') ? '#fff' : 'rgba(0, 0, 0, 0.45)',
+                                                          }}
+                                                          size="small"
+                                                        >
+                                                          {noteForm.getFieldValue('is_public') ? 'Public' : 'Private'}
+                                                        </Button>
+                                                      </Input.Group>
+                                                    </span>
+                                                  </Tooltip>
+                                                </Form.Item>
+                                                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                                                  <Button 
+                                                    size="small" 
+                                                    onClick={() => setEditingNoteId(null)}
+                                                  >
+                                                    Cancel
+                                                  </Button>
+                                                  <Button 
+                                                    type="primary" 
+                                                    size="small" 
+                                                    htmlType="submit"
+                                                    loading={isUpdatingNote}
+                                                    style={{ backgroundColor: "#000000", borderColor: "#000000" }}
+                                                  >
+                                                    Save
+                                                  </Button>
+                                                </div>
+                                              </Form>
+                                            ) : (
+                                              <Text
+                                                style={{
+                                                  width: "100%",
+                                                  color: "#000",
+                                                  textAlign: 'left'
+                                                }}
+                                              >
+                                                {note.content}
+                                                <div>
+                                                  <Text
+                                                    type="secondary"
+                                                    style={{ fontSize: "12px" }}
+                                                  >
+                                                    {formatDate(note.created_at)}
+                                                    {' '}
+                                                    <Text
+                                                      style={{
+                                                        display: 'inline-block',
+                                                        padding: '0 5px',
+                                                        fontSize: '11px',
+                                                        borderRadius: '3px',
+                                                        background: isCurrentUserNote(note, currentUser) ? '#1890ff' : 
+                                                                  isTeamOwnerNote(note, team) ? '#f56a00' : '#87d068',
+                                                        color: '#fff',
+                                                        marginLeft: '5px'
+                                                      }}
+                                                    >
+                                                      {isCurrentUserNote(note, currentUser) ? 'You' : 
+                                                      isTeamOwnerNote(note, team) ? 'Owner' : 'User'}
+                                                    </Text>
+                                                    {!note.is_public && (
+                                                      <Text
+                                                        style={{
+                                                          display: 'inline-block',
+                                                          padding: '0 5px',
+                                                          fontSize: '11px',
+                                                          borderRadius: '3px',
+                                                          background: '#ff7875',
+                                                          color: '#fff',
+                                                          marginLeft: '5px'
+                                                        }}
+                                                      >
+                                                        <LockOutlined style={{ fontSize: '10px' }} /> Private
+                                                      </Text>
+                                                    )}
+                                                    {note.user && !isCurrentUserNote(note, currentUser) && (
+                                                      <Text
+                                                        type="secondary"
+                                                        style={{ fontSize: "11px", marginLeft: '5px' , color: "#000"}}
+                                                      >
+                                                        by {note.user.name}
+                                                      </Text>
+                                                    )}
+                                                  </Text>
+                                                </div>
+                                              </Text>
+                                            )}
+                                          </List.Item>
+                                        )}
+                                      />
+                                    ) : (
+                                      <Text type="secondary">
+                                        No notes available
+                                      </Text>
+                                    )}
+                                  </>
+                                )}
+                              </Collapse.Panel>
+                            </Collapse>
                           </Space>
                         }
                       />

@@ -339,13 +339,16 @@ export default function Teams() {
         <Form form={form} layout="vertical" onFinish={handleCreateTeam}>
           <Form.Item
             name="name"
-            label="Team Name"
+            label={<span style={{ color: "#000000" }}>Team Name</span>}
             rules={[{ required: true, message: "Please input the team name!" }]}
           >
             <Input placeholder="Enter team name" />
           </Form.Item>
 
-          <Form.Item name="description" label="Description (optional)">
+          <Form.Item
+            name="description"
+            label={<span style={{ color: "#000000" }}>Description (optional)</span>}
+          >
             <Input.TextArea placeholder="Enter team description" rows={4} />
           </Form.Item>
 
