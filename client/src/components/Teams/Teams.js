@@ -21,6 +21,7 @@ import {
   UserOutlined,
   MoreOutlined,
   CalendarOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -105,6 +106,7 @@ export default function Teams() {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
+              Accept: "application/json",
               Authorization: `Bearer ${user?.access_token}`,
             },
           }
@@ -177,7 +179,7 @@ export default function Teams() {
       console.error("Error creating team:", error);
       message.error("Error connecting to server");
     } finally {
-        setAddLoading(false);
+      setAddLoading(false);
     }
   };
 
@@ -208,6 +210,14 @@ export default function Teams() {
           marginBottom: "24px",
         }}
       >
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate("/")}
+          style={{ marginBottom: "16px", color: "#ffffff" }}
+        >
+          Back to Teams
+        </Button>
         <Title level={2} style={{ margin: 0 }}>
           My Teams
         </Title>

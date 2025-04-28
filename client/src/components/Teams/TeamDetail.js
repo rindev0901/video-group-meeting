@@ -107,6 +107,7 @@ export default function TeamDetail() {
   const [team, setTeam] = useState(null);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [newMeetingModalVisible, setNewMeetingModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -119,6 +120,11 @@ export default function TeamDetail() {
 
   // Add state for deleting team
   const [deletingTeam, setDeletingTeam] = useState(false);
+
+  // Add state for editing meeting
+  const [editMeetingModalVisible, setEditMeetingModalVisible] = useState(false);
+  const [currentMeeting, setCurrentMeeting] = useState(null);
+  const [editMeetingForm] = Form.useForm();
 
   useEffect(() => {
     // Fetch team details from the API
@@ -140,9 +146,13 @@ export default function TeamDetail() {
 
         if (response.ok && data.success && data.data) {
           setTeam(data.data);
-          setMeetings(data.data.meetings);
-          // Fetch team meetings if available
-          // fetchTeamMeetings(teamId);
+          // Initially set meetings from team data
+          if (data.data.meetings) {
+            setMeetings(data.data.meetings);
+          } else {
+            // If meetings not included in team data, fetch them separately
+            fetchTeamMeetings();
+          }
         } else {
           // Show error from API if available
           message.error(data.message || "Team not found");
@@ -160,7 +170,34 @@ export default function TeamDetail() {
     fetchTeam();
   }, [teamId, navigate, currentUser]);
 
+  // Function to fetch team meetings
+  const fetchTeamMeetings = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/teams/${teamId}/meetings`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.data) {
+        setMeetings(data.data);
+      } else {
+        console.error("Failed to fetch meetings:", data.message);
+      }
+    } catch (error) {
+      console.error("Error fetching team meetings:", error);
+    }
+  };
+
   const handleInviteUser = async (values) => {
+    setInviteLoading(true);
     try {
       const response = await fetch(
         `${process.env.REACT_APP_API_BASE_URL}/teams/${teamId}/invite`,
@@ -186,20 +223,30 @@ export default function TeamDetail() {
     } catch (error) {
       console.error("Error sending invitation:", error);
       message.error("Error connecting to server");
+    } finally {
+      setInviteLoading(false);
     }
   };
 
   const handleCreateMeeting = async (values) => {
     try {
+      // Format the meeting data according to the required structure
+      const meetingData = {
+        team_id: parseInt(teamId),
+        title: values.title,
+        scheduled_at: values.date,
+        description: values.description || "",
+      };
+
       const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/teams/${teamId}/meetings`,
+        `${process.env.REACT_APP_API_BASE_URL}/meetings`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${currentUser?.access_token}`,
           },
-          body: JSON.stringify(values),
+          body: JSON.stringify(meetingData),
         }
       );
 
@@ -211,7 +258,12 @@ export default function TeamDetail() {
         meetingForm.resetFields();
 
         // Add the new meeting to the list
-        setMeetings([...meetings, data.data]);
+        if (data.data) {
+          setMeetings([...meetings, data.data]);
+        } else {
+          // Refetch meetings to get the updated list
+          fetchTeamMeetings();
+        }
       } else {
         message.error(data.message || "Failed to create meeting");
       }
@@ -225,7 +277,7 @@ export default function TeamDetail() {
   const handleRemoveMember = async (userId) => {
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/teams/${teamId}/members/${userId}`,
+        `${process.env.REACT_APP_API_BASE_URL}/teams/${teamId}/remove-user/${userId}`,
         {
           method: "DELETE",
           headers: {
@@ -261,6 +313,10 @@ export default function TeamDetail() {
   };
 
   const joinMeeting = (roomId) => {
+    // If roomId is not provided, generate one based on meeting ID and team ID
+    if (!roomId) {
+      return;
+    }
     navigate(`/room/${roomId}`);
   };
 
@@ -334,6 +390,66 @@ export default function TeamDetail() {
     } finally {
       setDeletingTeam(false);
     }
+  };
+
+  // Function to handle meeting update
+  const handleUpdateMeeting = async (values) => {
+    try {
+      // Format the meeting data according to the required structure
+      const meetingData = {
+        title: values.title,
+        scheduled_at: values.scheduled_at,
+        description: values.description || "",
+      };
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/meetings/${currentMeeting.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser?.access_token}`,
+          },
+          body: JSON.stringify(meetingData),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        message.success(data.message || `Meeting "${values.title}" updated`);
+        setEditMeetingModalVisible(false);
+        editMeetingForm.resetFields();
+
+        // Update the meeting in the local state
+        if (data.data) {
+          setMeetings(
+            meetings.map((meeting) =>
+              meeting.id === currentMeeting.id ? data.data : meeting
+            )
+          );
+        } else {
+          // Refetch meetings if the response doesn't include the updated meeting
+          fetchTeamMeetings();
+        }
+      } else {
+        message.error(data?.data || data.message || "Failed to update meeting");
+      }
+    } catch (error) {
+      console.error("Error updating meeting:", error);
+      message.error("Error connecting to server");
+    }
+  };
+
+  // Function to open the edit meeting modal
+  const handleEditMeeting = (meeting) => {
+    setCurrentMeeting(meeting);
+    editMeetingForm.setFieldsValue({
+      title: meeting.title,
+      scheduled_at: meeting.scheduled_at,
+      description: meeting.description || "",
+    });
+    setEditMeetingModalVisible(true);
   };
 
   if (loading) {
@@ -472,21 +588,25 @@ export default function TeamDetail() {
                 Invite
               </Button>
               <Popconfirm
-                title={<span style={{ color: "#faad14" }}>Delete this team?</span>}
-                description={<span style={{ color: "#faad14" }}>This action cannot be undone. All team data will be permanently removed.</span>}
+                title={
+                  <span style={{ color: "#faad14" }}>Delete this team?</span>
+                }
+                description={
+                  <span style={{ color: "#faad14" }}>
+                    This action cannot be undone. All team data will be
+                    permanently removed.
+                  </span>
+                }
                 onConfirm={handleDeleteTeam}
                 okText="Delete"
                 cancelText="Cancel"
-                okButtonProps={{ 
+                okButtonProps={{
                   loading: deletingTeam,
-                  danger: true, 
-                  style: { backgroundColor: "#ff4d4f", borderColor: "#ff4d4f" } 
+                  danger: true,
+                  style: { backgroundColor: "#ff4d4f", borderColor: "#ff4d4f" },
                 }}
               >
-                <Button 
-                  icon={<DeleteOutlined />} 
-                  danger
-                >
+                <Button icon={<DeleteOutlined />} danger>
                   Remove Team
                 </Button>
               </Popconfirm>
@@ -510,15 +630,6 @@ export default function TeamDetail() {
             children: (
               <Card
                 title="Upcoming Meetings"
-                extra={
-                  <Button
-                    type="link"
-                    onClick={() => setNewMeetingModalVisible(true)}
-                    style={{ color: "#ffffff" }}
-                  >
-                    Schedule New
-                  </Button>
-                }
                 style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
               >
                 <List
@@ -529,7 +640,7 @@ export default function TeamDetail() {
                       actions={[
                         <Button
                           type="primary"
-                          onClick={() => joinMeeting(meeting.room_id)}
+                          onClick={() => joinMeeting(meeting.code)}
                           style={{
                             backgroundColor: "#000000",
                             borderColor: "#000000",
@@ -537,7 +648,16 @@ export default function TeamDetail() {
                         >
                           Join
                         </Button>,
-                      ]}
+                        isOwner && (
+                          <Button
+                            type="default"
+                            icon={<EditOutlined />}
+                            onClick={() => handleEditMeeting(meeting)}
+                          >
+                            Edit
+                          </Button>
+                        ),
+                      ].filter(Boolean)}
                     >
                       <List.Item.Meta
                         avatar={
@@ -554,9 +674,16 @@ export default function TeamDetail() {
                               {formatTime(meeting.scheduled_at)}
                             </Text>
                             <Text type="secondary">
-                              {meeting.duration} minutes • Created by{" "}
-                              {meeting.created_by}
+                              Created by {meeting.created_by || team.owner.name}
                             </Text>
+                            {meeting.description && (
+                              <Text
+                                type="secondary"
+                                style={{ fontSize: "12px" }}
+                              >
+                                {meeting.description}
+                              </Text>
+                            )}
                           </Space>
                         }
                       />
@@ -649,7 +776,11 @@ export default function TeamDetail() {
 
       {/* Invite User Modal */}
       <Modal
-        title={<span style={{ color: "#000000" }}>Invite Member</span>}
+        title={
+          <span style={{ color: "#000000", fontWeight: "bold" }}>
+            Invite Member
+          </span>
+        }
         open={inviteModalVisible}
         onCancel={() => setInviteModalVisible(false)}
         footer={null}
@@ -657,7 +788,7 @@ export default function TeamDetail() {
         <Form form={form} layout="vertical" onFinish={handleInviteUser}>
           <Form.Item
             name="email"
-            label="Email Address"
+            label={<span style={{ color: "#000000" }}>Email Address</span>}
             rules={[
               { required: true, message: "Please input email address!" },
               { type: "email", message: "Please enter a valid email!" },
@@ -666,7 +797,14 @@ export default function TeamDetail() {
             <Input placeholder="Enter email address" />
           </Form.Item>
 
-          <Form.Item name="message" label="Personal Message (optional)">
+          <Form.Item
+            name="message"
+            label={
+              <span style={{ color: "#000000" }}>
+                Personal Message (optional)
+              </span>
+            }
+          >
             <Input.TextArea
               placeholder="Add a personal message to your invitation"
               rows={3}
@@ -684,6 +822,7 @@ export default function TeamDetail() {
             </Button>
             <Button
               type="primary"
+              loading={inviteLoading}
               htmlType="submit"
               style={{ backgroundColor: "#000000", borderColor: "#000000" }}
             >
@@ -695,7 +834,11 @@ export default function TeamDetail() {
 
       {/* Create Meeting Modal */}
       <Modal
-        title={<span style={{ color: "#000000" }}>Schedule Meeting</span>}
+        title={
+          <span style={{ color: "#000000", fontWeight: "bold" }}>
+            Schedule Meeting
+          </span>
+        }
         open={newMeetingModalVisible}
         onCancel={() => setNewMeetingModalVisible(false)}
         footer={null}
@@ -704,10 +847,15 @@ export default function TeamDetail() {
           form={meetingForm}
           layout="vertical"
           onFinish={handleCreateMeeting}
+          initialValues={{
+            title: "",
+            date: "",
+            description: "",
+          }}
         >
           <Form.Item
             name="title"
-            label="Meeting Title"
+            label={<span style={{ color: "#000000" }}>Meeting Title</span>}
             rules={[{ required: true, message: "Please input meeting title!" }]}
           >
             <Input placeholder="Enter meeting title" />
@@ -715,23 +863,21 @@ export default function TeamDetail() {
 
           <Form.Item
             name="date"
-            label="Date & Time"
+            label={<span style={{ color: "#000000" }}>Date & Time</span>}
             rules={[
               { required: true, message: "Please select date and time!" },
             ]}
+            tooltip="Format: YYYY-MM-DD HH:MM:SS"
           >
-            <Input type="datetime-local" />
+            <Input type="datetime-local" placeholder="YYYY-MM-DD HH:MM:SS" />
           </Form.Item>
 
           <Form.Item
-            name="duration"
-            label="Duration (minutes)"
-            rules={[{ required: true, message: "Please input duration!" }]}
+            name="description"
+            label={
+              <span style={{ color: "#000000" }}>Description (optional)</span>
+            }
           >
-            <Input type="number" min={15} max={180} defaultValue={30} />
-          </Form.Item>
-
-          <Form.Item name="description" label="Description (optional)">
             <Input.TextArea placeholder="Add meeting description" rows={3} />
           </Form.Item>
 
@@ -750,6 +896,75 @@ export default function TeamDetail() {
               style={{ backgroundColor: "#000000", borderColor: "#000000" }}
             >
               Schedule Meeting
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Edit Meeting Modal */}
+      <Modal
+        title={
+          <span style={{ color: "#000000", fontWeight: "bold" }}>
+            Edit Meeting
+          </span>
+        }
+        open={editMeetingModalVisible}
+        onCancel={() => setEditMeetingModalVisible(false)}
+        footer={null}
+      >
+        <Form
+          form={editMeetingForm}
+          layout="vertical"
+          onFinish={handleUpdateMeeting}
+          initialValues={{
+            title: currentMeeting?.title || "",
+            scheduled_at: currentMeeting?.scheduled_at || "",
+            description: currentMeeting?.description || "",
+          }}
+        >
+          <Form.Item
+            name="title"
+            label={<span style={{ color: "#000000" }}>Meeting Title</span>}
+            rules={[{ required: true, message: "Please input meeting title!" }]}
+          >
+            <Input placeholder="Enter meeting title" />
+          </Form.Item>
+
+          <Form.Item
+            name="scheduled_at"
+            label={<span style={{ color: "#000000" }}>Date & Time</span>}
+            rules={[
+              { required: true, message: "Please select date and time!" },
+            ]}
+            tooltip="Format: YYYY-MM-DD HH:MM:SS"
+          >
+            <Input type="datetime-local" placeholder="YYYY-MM-DD HH:MM:SS" />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label={
+              <span style={{ color: "#000000" }}>Description (optional)</span>
+            }
+          >
+            <Input.TextArea placeholder="Add meeting description" rows={3} />
+          </Form.Item>
+
+          <Divider />
+
+          <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
+            <Button
+              style={{ marginRight: 8 }}
+              onClick={() => setEditMeetingModalVisible(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              style={{ backgroundColor: "#000000", borderColor: "#000000" }}
+            >
+              Update Meeting
             </Button>
           </Form.Item>
         </Form>
